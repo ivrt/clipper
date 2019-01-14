@@ -14,6 +14,7 @@ import sys
 from cloudpickle import CloudPickler
 import pickle
 import numpy as np
+import base64, boto3
 if sys.version_info < (3, 0):
     try:
         from cStringIO import StringIO
@@ -343,6 +344,8 @@ class ClipperConnection(object):
         :py:exc:`clipper.UnconnectedException`
         :py:exc:`clipper.ClipperException`
         """
+        print('SETTING REGISTRY XX')
+        print(container_registry)
 
         if not self.connected:
             raise UnconnectedException()
@@ -458,22 +461,47 @@ class ClipperConnection(object):
             context_file.seek(0)
             image = "{cluster}-{name}:{version}".format(
                 cluster=self.cm.cluster_identifier, name=name, version=version)
+            print('SETTING REGISTRY')
+            print(container_registry)
             if container_registry is not None:
                 image = "{reg}/{image}".format(
                     reg=container_registry, image=image)
-            docker_client = docker.from_env()
+            docker_client = docker.from_env(version='1.24')
+            ecr_client = boto3.client('ecr', region_name='ap-southeast-1')
+
+            token = ecr_client.get_authorization_token()
+            username, password = base64.b64decode(token['authorizationData'][0]['authorizationToken']).decode().split(':')
+            registry = token['authorizationData'][0]['proxyEndpoint']
+
+            print('XVW repository', name)
+            try:
+                ecr_client.create_repository(repositoryName=name)
+            except:
+                pass
+
+            docker_client.login(username, password, registry=registry)
+            auth_config_payload = {'username': username, 'password': password}
+
             self.logger.info(
                 "Building model Docker image with model data from {}".format(
                     model_data_path))
+
             image_result, build_logs = docker_client.images.build(
                 fileobj=context_file, custom_context=True, tag=image)
             for b in build_logs:
                 if 'stream' in b and b['stream'] != '\n':  #log build steps only
                     self.logger.info(b['stream'].rstrip())
 
+        # docker_client.login(username='docker', password='password', registry='registry.pactly.ai')
+        # docker_client.login(username='AWS', password='eyJwYXlsb2FkIjoiaTQwSTVSSDdKNEFhU3luaGlQUWwrUWI3OGIydHYxamFCZ1dwNFJNSUE3di9iUE42ZkZ6SCt2MFF2NUppVUJMS05RZW5GN285NU1mY0pMSHZjRkxSK2ZDUEExNkhBVWZXb0o5TU1TVnliTk4zenlDemRaZmFVTU1ENTVWcU9BM2kzUlVuOFZNRU9VNWJxZXlCdmtmT0drejBFcGUwYk13V1FWWlJ0cVFZRnBmdE12Ri9pVWRNQWU0YjZGQnZEejVFTUVHZThqNDlnSjNWQXBUQkQyNGlxM1czUXM5WGlKNmN2OHhCeUhHVlMzcU9sekF3d2JRN25rOU5hdmpSSlFnQmpGbFdYSm9xaURMQXR1WlUxWTNld0g0cGUxK1VqL2NFWmhxQXBoV0JDa1J2bFhIZzFkay93R0szS3hKOWdYNCtUdVBnNmQ1OTExblpLYnp2UHVMekxwY3BCNEVTelpWV2o4Wk1RY0p5dFhQOG5RUTBkdDRUc3BDbHVvRnhFR01EdmpWNFMxdmhjZkg3VWJXMzJzeFVtakNrS1N2dmQvTnpSMDNrNHVza1M0cE9mMHVqVm5ISVFxQWdaT0N6N3Zod0EwV0t2RzIybENyWVN5blRRcEtFM28vMHpMUXpLcm9ZNkpvY3k4Wi9Lak1iQzd1aUUwSlQ5MjNVZ0FLTU1XWkx6MXFSUTRkTWZEbEduZVdyaEcyVjlFNC9YcUloNjN1dHMwc3BmYjB2Y09nQXdpWEFTcjA5bnYxVjBFdy80Rzc3RzJOSEcrdlJ3UVoxR1dWNEdLMmV2VHk2by9EVlQwZXQ1UUdSZFpwZlRwMXc0RC9rNXVvYVoxMytBeEd1bU1CcDNWcVdNTHF3WHFGOS9TMU94K3FTM2lzSW4yTWtsQWhsOXBHQVpGUVYyM1JtRjQzZ2R6MEpIdnkyNVRTZHcyK3o3cER0NGFtMWlvemIxYmFhNmtnRTZxamtNSlJZTWQxZkhJT3FZc3NsSVR0bjFrTG5DQmlpdCtRdVZvcXlkY2V6TGpBWUtUS1hjZHZPeEViSXNSVERTMUhhblROdnpSTkc3TGU3R3A5QXMyWVVISUx1dmJ2RndLOUw4ZnVsN3dhazBxdWRQQytOZmY2RTVRQ29jOFl2YWpRUDZTdnQ2bVJjUW1RREM4RWdMeWZqMzExYXdnUy95YVdTbDlIWTVTbnp3bGt1M0xJZHJxK0ZsWWNvQ3FCbkhxSmZMRk1oSDIrdFVUd3h2NGs0aE9BZEVhbTEyMmVVRFVOQVpueHUrZzRkNVJuMmlqV2YyRis0SkhHalVET0tNeTVJN0w2N0tEQ2VISEZ3bGtZYVg4MjFiTm9CUnFseUZYSnVWOHorM2FFUHZTR1dvS3hHbFdybVRNaE1vWi9NcU5nekR2RWthaG4yc0x3M1loZldyTkwxcEplTFFoQWVTbXlVU3hoM3kxNGxUSzVLQlhDOHRGb0dUTkpzNm5RWDArOUpWcSs0V0NaejdQcTA1b0c2NWJYdlQ3VT0iLCJkYXRha2V5IjoiQVFFQkFIaWRFclpDZmhLT2VETTA4K2NQNWZ0eWp2UTlYTU1TUTRwSzBGWm52QVpYSmdBQUFINHdmQVlKS29aSWh2Y05BUWNHb0c4d2JRSUJBREJvQmdrcWhraUc5dzBCQndFd0hnWUpZSVpJQVdVREJBRXVNQkVFREFzREpCUE5GMzB5bVJ4aWFBSUJFSUE3WEZKR2F2eXdBVTJCUW5JZVFUbjF1bjltUU01OW9FRmQrZENtNXBnWnJRWDNIWkFjOGNjVEdCY2VDRG1uME5hSWgreUJjRnRwaXV6WVhhND0iLCJ2ZXJzaW9uIjoiMiIsInR5cGUiOiJEQVRBX0tFWSIsImV4cGlyYXRpb24iOjE1NDcxNzE0NzZ9', registry='https://538473993190.dkr.ecr.ap-southeast-1.amazonaws.com')
+
+
+        # try:
         self.logger.info("Pushing model Docker image to {}".format(image))
-        for line in docker_client.images.push(repository=image, stream=True):
-            self.logger.debug(line)
+        docker_client.images.push(repository=image, stream=True, auth_config=auth_config_payload)
+        # except:
+        #     print("already got image")
+
         return image
 
     def deploy_model(self,

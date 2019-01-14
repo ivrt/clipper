@@ -234,6 +234,11 @@ def deploy_keras_model(clipper_conn,
             shutil.rmtree(serialization_dir)
             raise ClipperException(msg)
 
+    print('SETTING baseimage keras.py')
+    print(base_image)
+    print('SETTING REGISTRY keras.py')
+    print(registry)
+
     # Deploy model
     clipper_conn.build_and_deploy_model(
         name, version, input_type, serialization_dir, base_image, labels,
