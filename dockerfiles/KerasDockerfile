@@ -5,6 +5,7 @@ FROM clipper-base
 
 RUN pip install keras
 RUN pip install tensorflow
+RUN pip install numpy==1.16
 
 COPY containers/python/keras_container.py containers/python/container_entry.sh /container/
 
