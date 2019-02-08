@@ -20,3 +20,6 @@ dependency-reduced-pom.xml
 
 docker-compose.yml
 .ipynb_checkpoints
+
+# pactly
+models

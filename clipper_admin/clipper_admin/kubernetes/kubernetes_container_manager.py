@@ -392,6 +392,8 @@ class KubernetesContainerManager(ContainerManager):
             while self._k8s_beta.read_namespaced_deployment_status(
                 name=deployment_name, namespace=self.k8s_namespace).status.available_replicas \
                     != num_replicas:
+                # print('checking status', self._k8s_beta.read_namespaced_deployment_status(
+                # name=deployment_name, namespace=self.k8s_namespace).status)
                 time.sleep(3)
 
     def get_num_replicas(self, name, version):

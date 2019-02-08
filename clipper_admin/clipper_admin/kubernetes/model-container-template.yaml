@@ -41,5 +41,5 @@ spec:
               command:
                 - cat
                 - /model_is_ready.check
-            initialDelaySeconds: 3
+            initialDelaySeconds: 15
             periodSeconds: 3
